@@ -1,6 +1,7 @@
 # dependencies
 
 find_package(Threads REQUIRED)
+set(WHISPER_SDL2 ON)
 
 # third-party
 
@@ -39,6 +40,7 @@ set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_target_properties(${TARGET} PROPERTIES FOLDER "libs")
 
 if (WHISPER_SDL2)
+    message('👹👹👹👹👹')
     # common-sdl
 
     set(TARGET common-sdl)

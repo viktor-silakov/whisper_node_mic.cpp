@@ -10,7 +10,7 @@
     "compile": "cd ../.. && npx cmake-js compile -T addon.node.stream -B Release && cd --",
     "rebuild": "cd ../.. && npx cmake-js rebuild -T addon.node.stream -B Release && cd --",
     "clean": "cd ../.. && npx cmake-js clean && cd --",
-    "start": "GGML_METAL_PATH_RESOURCES='./metal' node index.js"
+    "start": "GGML_METAL_PATH_RESOURCES='./metal' node stream.js"
 
   },
   "devDependencies": {

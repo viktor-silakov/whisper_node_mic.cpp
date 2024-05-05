@@ -7,7 +7,12 @@ add_definitions(-DNAPI_VERSION=4)
 include_directories(${CMAKE_JS_INC})
 #==================================================================
 
-add_library(${TARGET} SHARED ${CMAKE_JS_SRC} addon.cpp)
+file(GLOB SOURCE_FILES "*.cpp")
+
+add_library(${TARGET} SHARED ${CMAKE_JS_SRC} addon.cpp params.cpp audio.cpp utils.cpp)
+
+# add_executable(${TARGET}_2 stream.cpp params.cpp audio.cpp utils.cpp)
+
 set_target_properties(${TARGET} PROPERTIES PREFIX "" SUFFIX ".node")
 
 include(DefaultTargetOptions)
@@ -23,7 +28,11 @@ string(REPLACE "\"" "" NODE_ADDON_API_DIR ${NODE_ADDON_API_DIR})
 target_include_directories(${TARGET} PRIVATE ${NODE_ADDON_API_DIR})
 #==================================================================
 
-target_link_libraries(${TARGET} ${CMAKE_JS_LIB} common whisper ${CMAKE_THREAD_LIBS_INIT})
+# target_link_libraries(${TARGET} ${CMAKE_JS_LIB} common whisper ${CMAKE_THREAD_LIBS_INIT})
+# target_link_libraries(${TARGET} PRIVATE common common-sdl whisper ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(${TARGET} PRIVATE ${CMAKE_JS_LIB} common whisper ${CMAKE_THREAD_LIBS_INIT} common-sdl)
+
+
 
 if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
     # Generate node.lib

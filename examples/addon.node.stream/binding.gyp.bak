@@ -1,0 +1,23 @@
+    {
+  "targets": [
+    {
+      "target_name": "addon.node.stream",
+      "sources": ["addon.cpp"],
+      "include_dirs": [
+        "<!@(node -p \"require('node-addon-api').include\")",
+        "."
+      ],
+      "sources": [
+        "utils.cpp",
+        "audio.cpp",
+        "params.cpp"
+      ],
+      "dependencies": [
+        "<!(node -p \"require('node-addon-api').gyp\")"
+      ],
+      "cflags!": ["-fno-exceptions"],
+      "cflags_cc!": ["-fno-exceptions"],
+      "defines": ["NAPI_DISABLE_CPP_EXCEPTIONS"]
+    }
+  ]
+}
