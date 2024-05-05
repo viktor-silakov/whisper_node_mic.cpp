@@ -1,7 +1,9 @@
 if (WHISPER_SDL2)
     # stream
     set(TARGET stream)
-    add_executable(${TARGET} stream.cpp)
+    add_executable(${TARGET} stream.cpp params.cpp audio.cpp)
+
+    target_include_directories(${TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
     include(DefaultTargetOptions)
 
