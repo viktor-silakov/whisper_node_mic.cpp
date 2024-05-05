@@ -6,7 +6,12 @@
   "author": "Qanhe Chen",
   "license": "MIT",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "compile": "cd ../.. && npx cmake-js compile -T addon.node -B Release && cd --",
+    "rebuild": "cd ../.. && npx cmake-js rebuild -T addon.node -B Release && cd --",
+    "clean": "cd ../.. && npx cmake-js clean && cd --",
+    "start": "GGML_METAL_PATH_RESOURCES='./metal' node index.js"
+
   },
   "devDependencies": {
     "cmake-js": "^7.1.1",
