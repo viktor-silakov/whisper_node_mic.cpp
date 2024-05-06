@@ -14,9 +14,6 @@
 
 class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
 public:
-  // WhisperWorker(Napi::Function& callback, whisper_params& params)
-  //     : Napi::AsyncProgressWorker<std::string>(callback), params(params) {}
-
   WhisperWorker(Napi::Function &callback, whisper_params &params)
       : Napi::AsyncProgressWorker<std::string>(callback), params(params),
         shouldStop(false) {}
@@ -45,7 +42,6 @@ public:
                           n_samples_keep, use_vad, n_new_line);
 
     int n_iter = 0;
-    // bool is_running = true;
 
     const auto t_start = std::chrono::high_resolution_clock::now();
 
@@ -153,11 +149,6 @@ public:
       }
 
       fprintf(stdout, "Iteration: %d \n", n_iter);
-
-      // Check if the audio processing is finished
-      // if (n_iter >= 10000) { //!!!!!!!!!!!!!!!!!!!!!!!
-      //     is_running = false;
-      // }
     }
 
     // Clean up
