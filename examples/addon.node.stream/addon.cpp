@@ -12,14 +12,14 @@
 #include <vector>
 #include <fstream>
 
-class WhisperWorker : public Napi::AsyncWorker {
+class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
 public:
     WhisperWorker(Napi::Function& callback, whisper_params& params)
-        : Napi::AsyncWorker(callback), params(params) {}
+        : Napi::AsyncProgressWorker<std::string>(callback), params(params) {}
 
     ~WhisperWorker() {}
 
-    void Execute() {
+    void Execute(const ExecutionProgress& progress) {
         // Initialize Whisper context
         ctx = init_whisper_context(params, 0, nullptr);
 
@@ -114,18 +114,19 @@ public:
 
             wparams.prompt_tokens = params.no_context ? nullptr : prompt_tokens.data();
             wparams.prompt_n_tokens = params.no_context ? 0 : prompt_tokens.size();
+            
 
             if (whisper_full(ctx, wparams, pcmf32.data(), pcmf32.size()) != 0) {
                 SetError("Failed to process audio");
                 return;
             }
 
-            // Store the transcription results
+            // Send the transcription results to the main thread
             const int n_segments = whisper_full_n_segments(ctx);
             for (int i = 0; i < n_segments; ++i) {
                 const char* text = whisper_full_get_segment_text(ctx, i);
                 std::string segment_text(text);
-                transcription_results.push_back(segment_text);
+                progress.Send(&segment_text, 1);
             }
 
             ++n_iter;
@@ -135,38 +136,35 @@ public:
                 update_prompt_tokens(ctx, prompt_tokens, params.no_context);
             }
 
+                fprintf(stdout, "ITER: %d \n", n_iter);
+
+
             // Check if the audio processing is finished
-            if (n_iter >= 1) {
+            if (n_iter >= 10000) { //!!!!!!!!!!!!!!!!!!!!!!!
                 is_running = false;
             }
         }
 
         // Clean up
         audio.pause();
+        
         whisper_print_timings(ctx);
         whisper_free(ctx);
     }
 
-    void OnOK() {
+    void OnProgress(const std::string* segment, size_t count) override {
         Napi::Env env = Env();
         Napi::HandleScope scope(env);
 
-        std::vector<napi_value> args;
-        args.push_back(env.Null());
+        Napi::Object obj = Napi::Object::New(env);
+        obj.Set("text", Napi::String::New(env, *segment));
 
-        for (const auto& segment : transcription_results) {
-            Napi::Object obj = Napi::Object::New(env);
-            obj.Set("text", Napi::String::New(env, segment));
-            args.push_back(obj);
-        }
-
-        Callback().Call(args);
+        Callback().Call({env.Null(), obj});
     }
 
 private:
     whisper_params params;
     whisper_context* ctx;
-    std::vector<std::string> transcription_results;
 
     const int n_samples_step = (1e-3 * params.step_ms) * WHISPER_SAMPLE_RATE;
     const int n_samples_len = (1e-3 * params.length_ms) * WHISPER_SAMPLE_RATE;
@@ -193,17 +191,43 @@ Napi::Value TranscribeAudio(const Napi::CallbackInfo& info) {
     Napi::Object obj = info[0].ToObject();
     Napi::Function callback = info[1].As<Napi::Function>();
 
+//  std::string model = obj.Has("model") ? obj.Get("model").As<Napi::String>().Utf8Value() : "default_model";
+//     int32_t n_threads = obj.Has("n_threads") ? obj.Get("n_threads").As<Napi::Number>().Int32Value() : 4;
+//     int32_t step_ms = obj.Has("step_ms") ? obj.Get("step_ms").As<Napi::Number>().Int32Value() : 10;
+//     int32_t length_ms = obj.Has("length_ms") ? obj.Get("length_ms").As<Napi::Number>().Int32Value() : 100;
+//     int32_t keep_ms = obj.Has("keep_ms") ? obj.Get("keep_ms").As<Napi::Number>().Int32Value() : 1000;
+//     int32_t capture_id = obj.Has("capture_id") ? obj.Get("capture_id").As<Napi::Number>().Int32Value() : 0;
+//     bool translate = obj.Has("translate") ? obj.Get("translate").As<Napi::Boolean>().Value() : false;
+//     bool use_gpu = obj.Has("use_gpu") ? obj.Get("use_gpu").As<Napi::Boolean>().Value() : false;
+//     std::string language = obj.Has("language") ? obj.Get("language").As<Napi::String>().Utf8Value() : "en";
+
+
     // Extract parameters from the object
+
+    int32_t n_threads = obj.Has("n_threads") ? obj.Get("n_threads").As<Napi::Number>().Int32Value() : 4;
+    int32_t step_ms = obj.Has("step_ms") ? obj.Get("step_ms").As<Napi::Number>().Int32Value() : 3000;
+    int32_t length_ms = obj.Has("length_ms") ? obj.Get("length_ms").As<Napi::Number>().Int32Value() : 10000; // useles??
+    int32_t keep_ms = obj.Has("keep_ms") ? obj.Get("keep_ms").As<Napi::Number>().Int32Value() : 200;
+    // int32_t capture_id = obj.Has("capture_id") ? obj.Get("capture_id").As<Napi::Number>().Int32Value() : 0;
+    // bool translate = obj.Has("translate") ? obj.Get("translate").As<Napi::Boolean>().Value() : false;
+    std::string language = obj.Has("language") ? obj.Get("language").As<Napi::String>().Utf8Value() : "en";
+
     std::string model = obj.Get("model").As<Napi::String>().Utf8Value();
-    int32_t n_threads = obj.Get("n_threads").As<Napi::Number>().Int32Value();
-    int32_t step_ms = obj.Get("step_ms").As<Napi::Number>().Int32Value();
-    int32_t length_ms = obj.Get("length_ms").As<Napi::Number>().Int32Value();
-    int32_t keep_ms = obj.Get("keep_ms").As<Napi::Number>().Int32Value();
-    int32_t capture_id = obj.Get("capture_id").As<Napi::Number>().Int32Value();
-    bool translate = obj.Get("translate").As<Napi::Boolean>().Value();
-    std::string language = obj.Get("language").As<Napi::String>().Utf8Value();
+    // int32_t n_threads = obj.Get("n_threads").As<Napi::Number>().Int32Value();
+    // int32_t step_ms = obj.Get("step_ms").As<Napi::Number>().Int32Value();
+    // int32_t length_ms = obj.Get("length_ms").As<Napi::Number>().Int32Value();
+    // int32_t keep_ms = obj.Get("keep_ms").As<Napi::Number>().Int32Value();
+    // int32_t capture_id = obj.Get("capture_id").As<Napi::Number>().Int32Value();
+    int32_t capture_id = obj.Has("capture_id") ? obj.Get("capture_id").As<Napi::Number>().Int32Value() : -1;
+
+    // bool translate = obj.Get("translate").As<Napi::Boolean>().Value();
+    bool translate = obj.Has("translate") ? obj.Get("translate").As<Napi::Boolean>().Value() : false;
+
+    bool use_gpu = obj.Has("use_gpu") ? obj.Get("use_gpu").As<Napi::Boolean>().Value() : true;
+    // std::string language = obj.Get("language").As<Napi::String>().Utf8Value();
 
     whisper_params params;
+    params.use_gpu = use_gpu;
     params.model = model;
     params.n_threads = n_threads;
     params.step_ms = step_ms;

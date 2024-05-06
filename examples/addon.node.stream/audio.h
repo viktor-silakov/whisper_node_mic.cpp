@@ -2,9 +2,13 @@
 
 #include <string>
 #include <vector>
+#include "common-sdl.h"
+#include "common.h"
 
-class audio_async;
-class wav_writer;
+
+
+// class audio_async;
+// class wav_writer;
 
 bool init_audio(audio_async& audio, int capture_id, int sample_rate);
 void create_wav_writer(wav_writer& wavWriter, const std::string& filename, int sample_rate);
