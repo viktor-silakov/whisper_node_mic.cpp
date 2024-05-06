@@ -1,6 +1,5 @@
 #include "common-sdl.h"
 #include "common.h"
-#include "params.h"
 #include "utils.h"
 #include "whisper.h"
 #include <napi.h>

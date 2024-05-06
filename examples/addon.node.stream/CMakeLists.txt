@@ -7,9 +7,9 @@ add_definitions(-DNAPI_VERSION=4)
 include_directories(${CMAKE_JS_INC})
 #==================================================================
 
-file(GLOB SOURCE_FILES "*.cpp")
+# file(GLOB SOURCE_FILES "*.cpp")
 
-add_library(${TARGET} SHARED ${CMAKE_JS_SRC} addon.cpp params.cpp audio.cpp utils.cpp)
+add_library(${TARGET} SHARED ${CMAKE_JS_SRC} addon.cpp audio.cpp utils.cpp)
 
 # add_executable(${TARGET}_2 stream.cpp params.cpp audio.cpp utils.cpp)
 
