@@ -31,7 +31,7 @@ const params = {
 //   language: 'en'
 // };
 
-const x = whisperAddon.transcribeAudio(params, (err, segment) => {
+const worker  = whisperAddon.transcribeAudio(params, (err, segment) => {
   console.log('👹')
   if (err) {
     console.error('Error:', err);
@@ -44,4 +44,12 @@ const x = whisperAddon.transcribeAudio(params, (err, segment) => {
     console.log('Transcription finished');
   }
 });
+
+console.log(worker);
+
+// Некоторое время спустя, когда нужно остановить транскрибирование
+setTimeout(() => {
+    // Остановка транскрибирования
+    worker.stop();
+}, 5000); // Например, остановить через 5 секунд
 

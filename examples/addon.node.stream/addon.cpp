@@ -14,9 +14,15 @@
 
 class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
 public:
-    WhisperWorker(Napi::Function& callback, whisper_params& params)
-        : Napi::AsyncProgressWorker<std::string>(callback), params(params) {}
+    // WhisperWorker(Napi::Function& callback, whisper_params& params)
+    //     : Napi::AsyncProgressWorker<std::string>(callback), params(params) {}
 
+    WhisperWorker(Napi::Function& callback, whisper_params& params)
+    : Napi::AsyncProgressWorker<std::string>(callback), params(params), shouldStop(false) {}
+
+    void Stop() {
+        shouldStop = true;
+    }
     ~WhisperWorker() {}
 
     void Execute(const ExecutionProgress& progress) {
@@ -39,11 +45,11 @@ public:
         print_processing_info(ctx, params, n_samples_step, n_samples_len, n_samples_keep, use_vad, n_new_line);
 
         int n_iter = 0;
-        bool is_running = true;
+        // bool is_running = true;
 
         const auto t_start = std::chrono::high_resolution_clock::now();
 
-        while (is_running) {
+        while (!shouldStop) {
             // Process audio and transcribe
             if (!use_vad) {
                 while (true) {
@@ -136,13 +142,13 @@ public:
                 update_prompt_tokens(ctx, prompt_tokens, params.no_context);
             }
 
-                fprintf(stdout, "ITER: %d \n", n_iter);
+           fprintf(stdout, "Iteration: %d \n", n_iter);
 
 
             // Check if the audio processing is finished
-            if (n_iter >= 10000) { //!!!!!!!!!!!!!!!!!!!!!!!
-                is_running = false;
-            }
+            // if (n_iter >= 10000) { //!!!!!!!!!!!!!!!!!!!!!!!
+            //     is_running = false;
+            // }
         }
 
         // Clean up
@@ -165,6 +171,8 @@ public:
 private:
     whisper_params params;
     whisper_context* ctx;
+
+    bool shouldStop;
 
     const int n_samples_step = (1e-3 * params.step_ms) * WHISPER_SAMPLE_RATE;
     const int n_samples_len = (1e-3 * params.length_ms) * WHISPER_SAMPLE_RATE;
@@ -191,40 +199,16 @@ Napi::Value TranscribeAudio(const Napi::CallbackInfo& info) {
     Napi::Object obj = info[0].ToObject();
     Napi::Function callback = info[1].As<Napi::Function>();
 
-//  std::string model = obj.Has("model") ? obj.Get("model").As<Napi::String>().Utf8Value() : "default_model";
-//     int32_t n_threads = obj.Has("n_threads") ? obj.Get("n_threads").As<Napi::Number>().Int32Value() : 4;
-//     int32_t step_ms = obj.Has("step_ms") ? obj.Get("step_ms").As<Napi::Number>().Int32Value() : 10;
-//     int32_t length_ms = obj.Has("length_ms") ? obj.Get("length_ms").As<Napi::Number>().Int32Value() : 100;
-//     int32_t keep_ms = obj.Has("keep_ms") ? obj.Get("keep_ms").As<Napi::Number>().Int32Value() : 1000;
-//     int32_t capture_id = obj.Has("capture_id") ? obj.Get("capture_id").As<Napi::Number>().Int32Value() : 0;
-//     bool translate = obj.Has("translate") ? obj.Get("translate").As<Napi::Boolean>().Value() : false;
-//     bool use_gpu = obj.Has("use_gpu") ? obj.Get("use_gpu").As<Napi::Boolean>().Value() : false;
-//     std::string language = obj.Has("language") ? obj.Get("language").As<Napi::String>().Utf8Value() : "en";
-
-
     // Extract parameters from the object
-
     int32_t n_threads = obj.Has("n_threads") ? obj.Get("n_threads").As<Napi::Number>().Int32Value() : 4;
     int32_t step_ms = obj.Has("step_ms") ? obj.Get("step_ms").As<Napi::Number>().Int32Value() : 3000;
     int32_t length_ms = obj.Has("length_ms") ? obj.Get("length_ms").As<Napi::Number>().Int32Value() : 10000; // useles??
     int32_t keep_ms = obj.Has("keep_ms") ? obj.Get("keep_ms").As<Napi::Number>().Int32Value() : 200;
-    // int32_t capture_id = obj.Has("capture_id") ? obj.Get("capture_id").As<Napi::Number>().Int32Value() : 0;
-    // bool translate = obj.Has("translate") ? obj.Get("translate").As<Napi::Boolean>().Value() : false;
     std::string language = obj.Has("language") ? obj.Get("language").As<Napi::String>().Utf8Value() : "en";
-
     std::string model = obj.Get("model").As<Napi::String>().Utf8Value();
-    // int32_t n_threads = obj.Get("n_threads").As<Napi::Number>().Int32Value();
-    // int32_t step_ms = obj.Get("step_ms").As<Napi::Number>().Int32Value();
-    // int32_t length_ms = obj.Get("length_ms").As<Napi::Number>().Int32Value();
-    // int32_t keep_ms = obj.Get("keep_ms").As<Napi::Number>().Int32Value();
-    // int32_t capture_id = obj.Get("capture_id").As<Napi::Number>().Int32Value();
     int32_t capture_id = obj.Has("capture_id") ? obj.Get("capture_id").As<Napi::Number>().Int32Value() : -1;
-
-    // bool translate = obj.Get("translate").As<Napi::Boolean>().Value();
     bool translate = obj.Has("translate") ? obj.Get("translate").As<Napi::Boolean>().Value() : false;
-
     bool use_gpu = obj.Has("use_gpu") ? obj.Get("use_gpu").As<Napi::Boolean>().Value() : true;
-    // std::string language = obj.Get("language").As<Napi::String>().Utf8Value();
 
     whisper_params params;
     params.use_gpu = use_gpu;
@@ -247,7 +231,15 @@ Napi::Value TranscribeAudio(const Napi::CallbackInfo& info) {
     WhisperWorker* worker = new WhisperWorker(callback, params);
     worker->Queue();
 
-    return env.Undefined();
+    // Создаем функцию обратного вызова для остановки работы
+    Napi::Function stopFunction = Napi::Function::New(env, [worker](const Napi::CallbackInfo& info) {
+        worker->Stop();
+    });
+
+    // Передаем функцию обратного вызова в JavaScript
+    Napi::Object n_obj = Napi::Object::New(env);
+    n_obj.Set("stop", stopFunction);
+    return n_obj;
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
