@@ -7,9 +7,10 @@ const params = {
   n_threads: 8,
   // step_ms: 500,
   step_ms: 0, // if step_ms is null voise autodetect (vad) activates (!) low process utilization!
-  length_ms: 5000,
+  length_ms: 3000,
   keep_ms: 500,
   // capture_id: -1,
+  capture_id: 1, // input device id (-1 for auto)
   // translate: false,
   // language: 'en',
   // use_gpu: false

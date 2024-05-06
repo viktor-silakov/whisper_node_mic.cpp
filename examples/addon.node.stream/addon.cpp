@@ -115,10 +115,13 @@ public:
           continue;
         }
 
-        audio.get(2000, pcmf32_new);
+        audio.get(1500, pcmf32_new);
 
         if (::vad_simple(pcmf32_new, WHISPER_SAMPLE_RATE, 1000,
                          params.vad_thold, params.freq_thold, false)) {
+          
+          fprintf(stdout, "VAD!\n");
+
           audio.get(params.length_ms, pcmf32);
         } else {
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -127,6 +130,7 @@ public:
       }
 
       if (whisper_full(ctx, wparams, pcmf32.data(), pcmf32.size()) != 0) {
+        fprintf(stdout, "whisper_full!!!\n");
         SetError("Failed to process audio");
         return;
       }

@@ -1,13 +1,7 @@
----
-runme:
-  id: 01HX40D7Y35FCSRE5R8Z2RMVP4
-  version: v3
----
+# Node.js Whisper.cpp Real-time Microphone Stream Transcription Addon
+This addon demonstrates the capability of performing real-time speech transcription using the Whisper model in Node.js environments. It captures audio from the microphone, processes it in real-time, and provides transcription results as the audio is being spoken. The addon supports streaming audio input and offers various configuration options to customize the transcription process.
 
-# addon
-
-This is an addon demo that can **perform whisper model reasoning in `node` and `electron` environments**, based on [cmake-js](https://github.com/cmake-js/cmake-js).
-It can be used as a reference for using the whisper.cpp project in other node projects.
+> **Note:** This project is currently in a demo state and is not actively maintained or developed. It serves as a reference implementation and a starting point for integrating the Whisper model into Node.js applications.
 
 ## Install
 
@@ -21,8 +15,57 @@ Make sure it is in the project root directory and compiled with make-js.
 
 ```shell {"id":"01HX40D7Y1VM75W12HGZ2ZWKTM"}
 # npx cmake-js compile -T addon.node.stream -B Release
-npm combile
+npm compile
 ```
+Rebuild: 
+```shell
+# rebuild
+npm rebuild
+```
+
+## Usage Example 
+
+```js
+// stream.js
+const whisperAddon = require('../../build/Release/addon.node.stream');
+
+
+const params = {
+  model: '../../models/ggml-base.en.bin',
+  n_threads: 8,
+  step_ms: 500,
+  step_ms: 0, // if step_ms is null voise autodetect (vad) activates (!) low process utilization!
+  length_ms: 3000,
+  keep_ms: 500,
+  // capture_id: -1,
+  capture_id: 1, // input device id (-1 for auto)
+  translate: false,
+  language: 'en',
+  use_gpu: false
+};
+
+const worker = whisperAddon.transcribeAudio(params, (err, data) => {
+  if (err) {
+    console.error('Error:', err);
+    return;
+  }
+
+  if (data) {
+    console.log('Transcription:', data.text);
+    if (data.text.toString().toLowerCase().includes('stop transcription')) {
+      console.log('💀 Stop phrase detected!');
+      data.stop()
+    }
+  } else {
+    console.log('Transcription finished');
+  }
+});
+```
+
+
+-----
+
+### From old readme file
 
 For Electron addon and cmake-js options, you can see [cmake-js](https://github.com/cmake-js/cmake-js) and make very few configuration changes.
 
