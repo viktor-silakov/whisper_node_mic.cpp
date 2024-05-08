@@ -20,6 +20,57 @@ public:
   void Stop() { shouldStop = true; }
   ~WhisperWorker() {}
 
+  void log_debug(const char* func, float energy_all, float energy_last, float vad_thold, float freq_thold) {
+    auto now = std::chrono::system_clock::now();
+    auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+    auto epoch = now_ms.time_since_epoch();
+    auto value = std::chrono::duration_cast<std::chrono::milliseconds>(epoch);
+    long long milliseconds = value.count();
+
+    auto now_time = std::chrono::system_clock::to_time_t(now);
+    char timestamp[24];
+    std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", std::localtime(&now_time));
+    
+    fprintf(stderr, "[%s.%03lld] %s: energy_all: %f, energy_last: %f, vad_thold: %f, freq_thold: %f\n",
+            timestamp, milliseconds % 1000, func, energy_all, energy_last, vad_thold, freq_thold);
+  }
+
+  bool vad_detection(std::vector<float> &pcmf32, int sample_rate, int last_ms, float vad_thold, float freq_thold, bool wait_for_fade_out, bool verbose) {
+    const int n_samples = pcmf32.size();
+    const int n_samples_last = (sample_rate * last_ms) / 1000;
+
+    // not enough samples - assume no speec
+    if (n_samples_last >= n_samples) return false;
+
+    if (freq_thold > 0.0f) high_pass_filter(pcmf32, freq_thold, sample_rate);
+
+    float energy_all = 0.0f;
+    float energy_last = 0.0f;
+
+    for (int i = 0; i < n_samples; i++) {
+        energy_all += fabsf(pcmf32[i]);
+        if (i >= n_samples - n_samples_last) {
+            energy_last += fabsf(pcmf32[i]);
+        }
+    }
+
+    energy_all /= n_samples;
+    energy_last /= n_samples_last;
+
+    if (verbose) {
+        log_debug(__func__, energy_all, energy_last, vad_thold, freq_thold);
+    }
+
+    // Подобранное пороговое значение для минимальной энергии
+    const float min_energy_threshold = 0.000130f;
+
+    bool speech_detected = wait_for_fade_out 
+        ? energy_last <= vad_thold * energy_all // Если ждем окончания речи, речь завершается, когда энергия падает
+        : energy_last > vad_thold * energy_all && energy_last > min_energy_threshold; // В противном случае речь обнаруживается, если превышен порог
+
+    return speech_detected;
+  }
+
   void Execute(const ExecutionProgress &progress) {
     // Initialize Whisper context
     ctx = init_whisper_context(params, 0, nullptr);
@@ -104,6 +155,7 @@ public:
 
         pcmf32_old = pcmf32;
       } else {
+        // Stage 1: Waiting
         const auto t_now = std::chrono::high_resolution_clock::now();
         const auto t_diff =
             std::chrono::duration_cast<std::chrono::milliseconds>(t_now -
@@ -114,44 +166,61 @@ public:
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
           continue;
         }
+        // Stage 2: Voice Detect (VAD)
+        // Stage 2.1 get sample for VAD
+        audio.get(1100, pcmf32_new);
 
-        audio.get(1500, pcmf32_new);
 
-        if (::vad_simple(pcmf32_new, WHISPER_SAMPLE_RATE, 1000,
-                         params.vad_thold, params.freq_thold, false)) {
+        // Stage 2.2 if voice detected get length_ms audio
+        if (vad_detection(pcmf32_new, WHISPER_SAMPLE_RATE, 1000,params.vad_thold, params.freq_thold, true,  true)) {
           
           fprintf(stdout, "VAD!\n");
 
           audio.get(params.length_ms, pcmf32);
+
+          // fprintf(stdout, "VAD AFTER GET!\n");
+
         } else {
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
           continue;
         }
       }
+      // fprintf(stdout, "%zu NEXT!\n", pcmf32.size());
+
+      // Stage 3: Transcribe
+      // Stage 3.1: 
 
       if (whisper_full(ctx, wparams, pcmf32.data(), pcmf32.size()) != 0) {
-        fprintf(stdout, "whisper_full!!!\n");
-        SetError("Failed to process audio");
+        fprintf(stdout, "Error: problem during invocation of 'whisper_full'\n");
+        SetError("Failed to process audio: whisper_full");
         return;
       }
 
+      // std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+
+      // Stage 3.2: 
       // Send the transcription results to the main thread
       const int n_segments = whisper_full_n_segments(ctx);
+
+      // fprintf(stdout, "Segments - %d \n", n_segments);
       for (int i = 0; i < n_segments; ++i) {
         const char *text = whisper_full_get_segment_text(ctx, i);
         std::string segment_text(text);
+        fprintf(stdout, "TEXT #%d: %s \n", i, text);
+
         progress.Send(&segment_text, 1);
       }
 
+      // fprintf(stdout, "Iteration: %d \n", n_iter);
+
       ++n_iter;
 
-      if (!use_vad && (n_iter % n_new_line) == 0) {
-        pcmf32_old =
-            std::vector<float>(pcmf32.end() - n_samples_keep, pcmf32.end());
-        update_prompt_tokens(ctx, prompt_tokens, params.no_context);
-      }
+      // if (!use_vad && (n_iter % n_new_line) == 0) {
+      //   pcmf32_old =
+      //       std::vector<float>(pcmf32.end() - n_samples_keep, pcmf32.end());
+      //   update_prompt_tokens(ctx, prompt_tokens, params.no_context);
+      // }
 
-      fprintf(stdout, "Iteration: %d \n", n_iter);
     }
 
     // Clean up

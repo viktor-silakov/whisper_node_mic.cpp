@@ -4,11 +4,12 @@ const whisperAddon = require('../../build/Release/addon.node.stream');
 
 const params = {
   model: '../../models/ggml-base.en.bin',
-  n_threads: 8,
+  n_threads: 8, // number of threads
   // step_ms: 500,
-  step_ms: 0, // if step_ms is null voise autodetect (vad) activates (!) low process utilization!
-  length_ms: 3000,
-  keep_ms: 500,
+  step_ms: 0, // audio step size
+              // if step_ms is null voise autodetect (vad) activates (!) low process utilization!
+  length_ms: 3000, // audio length
+  keep_ms: 500, // audio to keep from previous step
   // capture_id: -1,
   capture_id: 1, // input device id (-1 for auto)
   // translate: false,
@@ -33,6 +34,12 @@ const worker = whisperAddon.transcribeAudio(params, (err, data) => {
     console.log('Transcription finished');
   }
 });
+
+process.on('SIGINT', () => {
+  console.log('\nReceived SIGINT. 👋 Bye!');
+  worker.stop();
+});
+
 
 // console.log(worker);
 
