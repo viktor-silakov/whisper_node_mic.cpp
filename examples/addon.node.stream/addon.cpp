@@ -11,7 +11,8 @@
 #include <thread>
 #include <vector>
 
-class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
+class WhisperWorker : public Napi::AsyncProgressWorker<std::string>
+{
 public:
   WhisperWorker(Napi::Function &callback, whisper_params &params)
       : Napi::AsyncProgressWorker<std::string>(callback), params(params),
@@ -20,7 +21,9 @@ public:
   void Stop() { shouldStop = true; }
   ~WhisperWorker() {}
 
-  void log_debug(const char* func, float energy_all, float energy_last, float vad_thold, float freq_thold) {
+  void log_debug(const char *func, float energy_all, float energy_last,
+                 float vad_thold, float freq_thold)
+  {
     auto now = std::chrono::system_clock::now();
     auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
     auto epoch = now_ms.time_since_epoch();
@@ -29,54 +32,74 @@ public:
 
     auto now_time = std::chrono::system_clock::to_time_t(now);
     char timestamp[24];
-    std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", std::localtime(&now_time));
-    
-    fprintf(stderr, "[%s.%03lld] %s: energy_all: %f, energy_last: %f, vad_thold: %f, freq_thold: %f\n",
-            timestamp, milliseconds % 1000, func, energy_all, energy_last, vad_thold, freq_thold);
+    std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S",
+                  std::localtime(&now_time));
+
+    fprintf(stderr,
+            "[%s.%03lld] %s: energy_all: %f, energy_last: %f, vad_thold: %f, "
+            "freq_thold: %f\n",
+            timestamp, milliseconds % 1000, func, energy_all, energy_last,
+            vad_thold, freq_thold);
   }
 
-  bool vad_detection(std::vector<float> &pcmf32, int sample_rate, int last_ms, float vad_thold, float freq_thold, bool wait_for_fade_out, bool verbose) {
+  bool vad_detection(std::vector<float> &pcmf32, int sample_rate, int last_ms,
+                     float vad_thold, float freq_thold, bool wait_for_fade_out,
+                     bool verbose)
+  {
     const int n_samples = pcmf32.size();
     const int n_samples_last = (sample_rate * last_ms) / 1000;
 
     // not enough samples - assume no speec
-    if (n_samples_last >= n_samples) return false;
+    if (n_samples_last >= n_samples)
+      return false;
 
-    if (freq_thold > 0.0f) high_pass_filter(pcmf32, freq_thold, sample_rate);
+    if (freq_thold > 0.0f)
+      high_pass_filter(pcmf32, freq_thold, sample_rate);
 
     float energy_all = 0.0f;
     float energy_last = 0.0f;
 
-    for (int i = 0; i < n_samples; i++) {
-        energy_all += fabsf(pcmf32[i]);
-        if (i >= n_samples - n_samples_last) {
-            energy_last += fabsf(pcmf32[i]);
-        }
+    for (int i = 0; i < n_samples; i++)
+    {
+      energy_all += fabsf(pcmf32[i]);
+      if (i >= n_samples - n_samples_last)
+      {
+        energy_last += fabsf(pcmf32[i]);
+      }
     }
 
     energy_all /= n_samples;
     energy_last /= n_samples_last;
 
-    if (verbose) {
-        log_debug(__func__, energy_all, energy_last, vad_thold, freq_thold);
+    if (verbose)
+    {
+      log_debug(__func__, energy_all, energy_last, vad_thold, freq_thold);
     }
 
     // Подобранное пороговое значение для минимальной энергии
     const float min_energy_threshold = 0.000130f;
 
-    bool speech_detected = wait_for_fade_out 
-        ? energy_last <= vad_thold * energy_all // Если ждем окончания речи, речь завершается, когда энергия падает
-        : energy_last > vad_thold * energy_all && energy_last > min_energy_threshold; // В противном случае речь обнаруживается, если превышен порог
+    bool speech_detected =
+        wait_for_fade_out
+            ? energy_last <=
+                  vad_thold * energy_all // Если ждем окончания речи, речь
+                                         // завершается, когда энергия падает
+            : energy_last > vad_thold * energy_all &&
+                  energy_last > min_energy_threshold; // В противном случае речь
+                                                      // обнаруживается, если
+                                                      // превышен порог
 
     return speech_detected;
   }
 
-  void Execute(const ExecutionProgress &progress) {
+  void Execute(const ExecutionProgress &progress)
+  {
     // Initialize Whisper context
     ctx = init_whisper_context(params, 0, nullptr);
 
     audio_async audio(params.length_ms);
-    if (!audio.init(params.capture_id, WHISPER_SAMPLE_RATE)) {
+    if (!audio.init(params.capture_id, WHISPER_SAMPLE_RATE))
+    {
       SetError("Audio initialization failed");
       return;
     }
@@ -119,12 +142,24 @@ public:
     wparams.prompt_tokens = params.no_context ? nullptr : prompt_tokens.data();
     wparams.prompt_n_tokens = params.no_context ? 0 : prompt_tokens.size();
 
-    while (!shouldStop) {
+    // Определите значения по умолчанию
+    const int default_last_ms = 1000;
+    const int min_last_ms = 120;
+    const int decrement_ms = 100;
+    const int max_ms = 10000; // Максимальное время для транскрипции, 10 секунд
+    int last_ms = default_last_ms;
+    auto last_sample_time = std::chrono::high_resolution_clock::now();
+
+    while (!shouldStop)
+    {
       // Process audio and transcribe
-      if (!use_vad) {
-        while (true) {
+      if (!use_vad)
+      {
+        while (true)
+        {
           audio.get(params.step_ms, pcmf32_new);
-          if ((int)pcmf32_new.size() > 2 * n_samples_step) {
+          if ((int)pcmf32_new.size() > 2 * n_samples_step)
+          {
             fprintf(stderr,
                     "\n\n%s: WARNING: cannot process audio fast enough, "
                     "dropping audio ...\n\n",
@@ -132,7 +167,8 @@ public:
             audio.clear();
             continue;
           }
-          if ((int)pcmf32_new.size() >= n_samples_step) {
+          if ((int)pcmf32_new.size() >= n_samples_step)
+          {
             audio.clear();
             break;
           }
@@ -146,7 +182,8 @@ public:
 
         pcmf32.resize(n_samples_new + n_samples_take);
 
-        for (int i = 0; i < n_samples_take; i++) {
+        for (int i = 0; i < n_samples_take; i++)
+        {
           pcmf32[i] = pcmf32_old[pcmf32_old.size() - n_samples_take + i];
         }
 
@@ -154,15 +191,17 @@ public:
                n_samples_new * sizeof(float));
 
         pcmf32_old = pcmf32;
-      } else {
+      }
+      else
+      {
         // Stage 1: Waiting
         const auto t_now = std::chrono::high_resolution_clock::now();
         const auto t_diff =
-            std::chrono::duration_cast<std::chrono::milliseconds>(t_now -
-                                                                  t_start)
+            std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_start)
                 .count();
 
-        if (t_diff < 2000) {
+        if (t_diff < 2000)
+        {
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
           continue;
         }
@@ -170,17 +209,67 @@ public:
         // Stage 2.1 get sample for VAD
         audio.get(1100, pcmf32_new);
 
-
         // Stage 2.2 if voice detected get length_ms audio
-        if (vad_detection(pcmf32_new, WHISPER_SAMPLE_RATE, 1000,params.vad_thold, params.freq_thold, true,  true)) {
-          
-          fprintf(stdout, "VAD!\n");
+        // fprintf(stdout, "Before VAD: last_ms: %d \n", last_ms);
+        if (vad_detection(pcmf32_new, WHISPER_SAMPLE_RATE, last_ms,
+                          params.vad_thold, params.freq_thold, true, false))
+        {
+          fprintf(stdout, "✅ VAD Detected!\n");
 
-          audio.get(params.length_ms, pcmf32);
+          // Определить продолжительность следующей выборки
+          // const int time_since_last =
+          //     std::chrono::duration_cast<std::chrono::milliseconds>(
+          //         t_now - last_sample_time)
+          //         .count();
+          const int time_since_last =
+              std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::high_resolution_clock::now() - last_sample_time)
+                  .count();
 
-          // fprintf(stdout, "VAD AFTER GET!\n");
+          // fprintf(stdout, "time_since_last: %d\n", time_since_last);
 
-        } else {
+          if (static_cast<int>(time_since_last) > max_ms)
+          {
+            fprintf(stdout, "Warning: max_ms: '%d' - exided: '%d'\n", max_ms, time_since_last);
+          }
+          int capture_length_ms = std::min(max_ms, static_cast<int>(time_since_last));
+          // int capture_length_ms = std::min(params.length_ms, static_cast<int>(time_since_last));
+
+          // fprintf(stdout, "capture_length_ms: %d\n", capture_length_ms);
+
+          audio.get(capture_length_ms, pcmf32);
+          last_sample_time =
+              std::chrono::high_resolution_clock::now(); // Сохранить время
+                                                         // последнего захвата
+
+          // Сбросить окно паузы на значение по умолчанию
+          last_ms = default_last_ms;
+        }
+        else
+        {
+          // fprintf(stdout, "🤡Vad not detect!\n");
+
+          // similar to 'time_since_last' in the corresponding if block
+          const int elapsed_ms =
+              static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - last_sample_time).count());
+
+          // fprintf(stdout, "Elapsed time since last sample: %d ms\n", elapsed_ms);
+
+          // Уменьшить окно паузы, но не ниже минимального
+          if ((last_ms > min_last_ms) && elapsed_ms > params.length_ms)
+          {
+            last_ms = std::max(last_ms - decrement_ms, min_last_ms);
+          }
+          // Проверьте, не превышает ли общая продолжительность max_ms
+          const auto total_diff =
+              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t_start).count();
+          if (elapsed_ms > max_ms)
+          {
+            fprintf(stdout, "⚠️☢️ Warning: Maximum transcription time reached, "
+                            "some audio may be lost.\n");
+          }
+
+          // Подождать перед следующим циклом
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
           continue;
         }
@@ -188,9 +277,10 @@ public:
       // fprintf(stdout, "%zu NEXT!\n", pcmf32.size());
 
       // Stage 3: Transcribe
-      // Stage 3.1: 
+      // Stage 3.1:
 
-      if (whisper_full(ctx, wparams, pcmf32.data(), pcmf32.size()) != 0) {
+      if (whisper_full(ctx, wparams, pcmf32.data(), pcmf32.size()) != 0)
+      {
         fprintf(stdout, "Error: problem during invocation of 'whisper_full'\n");
         SetError("Failed to process audio: whisper_full");
         return;
@@ -198,12 +288,13 @@ public:
 
       // std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
-      // Stage 3.2: 
+      // Stage 3.2:
       // Send the transcription results to the main thread
       const int n_segments = whisper_full_n_segments(ctx);
 
       // fprintf(stdout, "Segments - %d \n", n_segments);
-      for (int i = 0; i < n_segments; ++i) {
+      for (int i = 0; i < n_segments; ++i)
+      {
         const char *text = whisper_full_get_segment_text(ctx, i);
         std::string segment_text(text);
         fprintf(stdout, "TEXT #%d: %s \n", i, text);
@@ -220,7 +311,6 @@ public:
       //       std::vector<float>(pcmf32.end() - n_samples_keep, pcmf32.end());
       //   update_prompt_tokens(ctx, prompt_tokens, params.no_context);
       // }
-
     }
 
     // Clean up
@@ -230,7 +320,8 @@ public:
     whisper_free(ctx);
   }
 
-  void OnProgress(const std::string *segment, size_t count) override {
+  void OnProgress(const std::string *segment, size_t count) override
+  {
     Napi::Env env = Env();
     Napi::HandleScope scope(env);
 
@@ -239,10 +330,10 @@ public:
 
     // Include the Stop function in the object sent to the callback
     Napi::Function stopFunction = Napi::Function::New(
-        env, [this](const Napi::CallbackInfo &info) { this->Stop(); });
-    obj.Set(
-        "stop",
-        stopFunction); // Added stop method directly to the callback object
+        env, [this](const Napi::CallbackInfo &info)
+        { this->Stop(); });
+    obj.Set("stop",
+            stopFunction); // Added stop method directly to the callback object
 
     Callback().Call({env.Null(), obj});
   }
@@ -263,16 +354,19 @@ private:
       !use_vad ? std::max(1, params.length_ms / params.step_ms - 1) : 1;
 };
 
-Napi::Value TranscribeAudio(const Napi::CallbackInfo &info) {
+Napi::Value TranscribeAudio(const Napi::CallbackInfo &info)
+{
   Napi::Env env = info.Env();
 
-  if (info.Length() < 2) {
+  if (info.Length() < 2)
+  {
     Napi::TypeError::New(env, "Wrong number of arguments")
         .ThrowAsJavaScriptException();
     return env.Null();
   }
 
-  if (!info[0].IsObject() || !info[1].IsFunction()) {
+  if (!info[0].IsObject() || !info[1].IsFunction())
+  {
     Napi::TypeError::New(env, "Wrong arguments").ThrowAsJavaScriptException();
     return env.Null();
   }
@@ -331,7 +425,8 @@ Napi::Value TranscribeAudio(const Napi::CallbackInfo &info) {
 
   // Создаем функцию обратного вызова для остановки работы
   Napi::Function stopFunction = Napi::Function::New(
-      env, [worker](const Napi::CallbackInfo &info) { worker->Stop(); });
+      env, [worker](const Napi::CallbackInfo &info)
+      { worker->Stop(); });
 
   // Передаем функцию обратного вызова в JavaScript
   Napi::Object n_obj = Napi::Object::New(env);
@@ -339,7 +434,8 @@ Napi::Value TranscribeAudio(const Napi::CallbackInfo &info) {
   return n_obj;
 }
 
-Napi::Object Init(Napi::Env env, Napi::Object exports) {
+Napi::Object Init(Napi::Env env, Napi::Object exports)
+{
   exports.Set(Napi::String::New(env, "transcribeAudio"),
               Napi::Function::New(env, TranscribeAudio));
   return exports;

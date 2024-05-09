@@ -24,7 +24,7 @@ const worker = whisperAddon.transcribeAudio(params, (err, data) => {
   }
 
   if (data) {
-    console.log('Transcription:', data.text);
+    console.log('✨ Transcription:', data.text);
     // console.dir(data)
     if (data.text.toString().toLowerCase().includes('stop transcription')) {
       console.log('💀 Stop detected!');
