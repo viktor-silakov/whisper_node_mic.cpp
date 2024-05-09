@@ -143,11 +143,11 @@ public:
     wparams.prompt_n_tokens = params.no_context ? 0 : prompt_tokens.size();
 
     // Определите значения по умолчанию
-    const int default_last_ms = 1000;
+    const int default_vad_window = 1000;
     const int min_last_ms = 120;
     const int decrement_ms = 100;
     const int max_ms = 10000; // Максимальное время для транскрипции, 10 секунд
-    int last_ms = default_last_ms;
+    int vad_window_ms = default_vad_window;
     auto last_sample_time = std::chrono::high_resolution_clock::now();
 
     while (!shouldStop)
@@ -209,33 +209,26 @@ public:
         // Stage 2.1 get sample for VAD
         audio.get(1100, pcmf32_new);
 
-        // Stage 2.2 if voice detected get length_ms audio
-        // fprintf(stdout, "Before VAD: last_ms: %d \n", last_ms);
-        if (vad_detection(pcmf32_new, WHISPER_SAMPLE_RATE, last_ms,
+        // Stage 2.2 if voice detected get vad_window_ms audio
+        // fprintf(stdout, "Before VAD: vad_window_ms: %d \n", vad_window_ms);
+        if (vad_detection(pcmf32_new, WHISPER_SAMPLE_RATE, vad_window_ms,
                           params.vad_thold, params.freq_thold, true, false))
         {
           fprintf(stdout, "✅ VAD Detected!\n");
 
           // Определить продолжительность следующей выборки
-          // const int time_since_last =
-          //     std::chrono::duration_cast<std::chrono::milliseconds>(
-          //         t_now - last_sample_time)
-          //         .count();
           const int time_since_last =
-              std::chrono::duration_cast<std::chrono::milliseconds>(
+              static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
                   std::chrono::high_resolution_clock::now() - last_sample_time)
-                  .count();
+                  .count());
 
           // fprintf(stdout, "time_since_last: %d\n", time_since_last);
 
-          if (static_cast<int>(time_since_last) > max_ms)
+          if (time_since_last > max_ms)
           {
             fprintf(stdout, "Warning: max_ms: '%d' - exided: '%d'\n", max_ms, time_since_last);
           }
-          int capture_length_ms = std::min(max_ms, static_cast<int>(time_since_last));
-          // int capture_length_ms = std::min(params.length_ms, static_cast<int>(time_since_last));
-
-          // fprintf(stdout, "capture_length_ms: %d\n", capture_length_ms);
+          int capture_length_ms = std::min(max_ms, time_since_last);
 
           audio.get(capture_length_ms, pcmf32);
           last_sample_time =
@@ -243,12 +236,10 @@ public:
                                                          // последнего захвата
 
           // Сбросить окно паузы на значение по умолчанию
-          last_ms = default_last_ms;
+          vad_window_ms = default_vad_window;
         }
         else
         {
-          // fprintf(stdout, "🤡Vad not detect!\n");
-
           // similar to 'time_since_last' in the corresponding if block
           const int elapsed_ms =
               static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - last_sample_time).count());
@@ -256,20 +247,19 @@ public:
           // fprintf(stdout, "Elapsed time since last sample: %d ms\n", elapsed_ms);
 
           // Уменьшить окно паузы, но не ниже минимального
-          if ((last_ms > min_last_ms) && elapsed_ms > params.length_ms)
+          if ((vad_window_ms > min_last_ms) && elapsed_ms > params.length_ms)
           {
-            last_ms = std::max(last_ms - decrement_ms, min_last_ms);
-          }
-          // Проверьте, не превышает ли общая продолжительность max_ms
-          const auto total_diff =
-              std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t_start).count();
-          if (elapsed_ms > max_ms)
-          {
-            fprintf(stdout, "⚠️☢️ Warning: Maximum transcription time reached, "
-                            "some audio may be lost.\n");
+            vad_window_ms = std::max(vad_window_ms - decrement_ms, min_last_ms);
           }
 
-          // Подождать перед следующим циклом
+          if (elapsed_ms > max_ms)
+          {
+            fprintf(stdout, "⚠️ Warning: Maximum transcription time reached, "
+                            "some audio may be lost.\n");
+          }
+          fprintf(stdout, "No VAD, elapsed_ms: %d, vad_window_ms: %d,  max_ms: %d, length_ms: %d \n", elapsed_ms, vad_window_ms, max_ms, params.length_ms);
+
+          // wait for next iteration
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
           continue;
         }
@@ -286,7 +276,6 @@ public:
         return;
       }
 
-      // std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
       // Stage 3.2:
       // Send the transcription results to the main thread
