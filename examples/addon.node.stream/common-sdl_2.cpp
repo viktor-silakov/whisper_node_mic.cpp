@@ -237,7 +237,11 @@ void audio_async::callback(uint8_t* stream, int len) {
   // print_energy();
 }
 
-int audio_async::get_total_silence_ms() { return m_total_silence_ms; }
+int audio_async::get_total_silence_ms() { 
+  int result = m_total_silence_ms;
+  m_total_silence_ms = 0;
+  return result; 
+  }
 
 void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
   if (!m_running) {

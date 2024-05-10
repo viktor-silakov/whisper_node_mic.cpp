@@ -215,9 +215,13 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
             fprintf(stdout, "Warning: max_ms: '%d' - exided: '%d'\n", max_ms,
                     time_since_last);
           }
+          
+          int skipped_ms =  audio.get_total_silence_ms();
+          time_since_last = time_since_last - skipped_ms;
           int capture_length_ms = std::min(max_ms, time_since_last);
+          
+          audio.get(capture_length_ms, pcmf32, true);
 
-          int skipped_ms = audio.get(capture_length_ms, pcmf32, true);
 
           fprintf(stdout, "skipped_ms: %d \n", skipped_ms);
 
