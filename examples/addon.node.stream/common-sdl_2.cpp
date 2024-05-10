@@ -1,14 +1,16 @@
+#include "common-sdl_2.h"
+
 #include <cstdio>
 #include <iomanip>
 #include <iostream>
-
-#include "common-sdl_2.h"
 // #include "common-sdl.h"
 
 audio_async::audio_async(int len_ms, bool ignore_silence) {
   m_len_ms = len_ms;
   m_ignore_silence = ignore_silence;
   m_running = false;
+  // m_audio.resize(100, 0.0055f); // Инициализируем буфер одним нулевым
+  // значением
 }
 
 audio_async::~audio_async() {
@@ -235,6 +237,8 @@ void audio_async::callback(uint8_t* stream, int len) {
   // print_energy();
 }
 
+int audio_async::get_total_silence_ms() { return m_total_silence_ms; }
+
 void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
   if (!m_running) {
     return;
@@ -257,12 +261,8 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
   }
   energy = std::sqrt(energy / temp_buffer.size());
 
-  if (energy < 0.0050) {
-    // Если энергия ниже порога, заполняем временный буфер нулями
-    std::fill(temp_buffer.begin(), temp_buffer.end(), 0.0f);
-  }
-
-  {
+  if (energy >= 0.0050) {
+    // Если энергия выше порога, записываем семплы в буфер
     std::lock_guard<std::mutex> lock(m_mutex);
 
     if (m_audio_pos + n_samples > m_audio.size()) {
@@ -281,20 +281,25 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
       m_audio_pos = (m_audio_pos + n_samples) % m_audio.size();
       m_audio_len = std::min(m_audio_len + n_samples, m_audio.size());
     }
+  } else {
+    // Если энергия ниже порога, увеличиваем счетчик тишины
+    int silence_ms = (n_samples * 1000) / m_sample_rate;
+    m_total_silence_ms += silence_ms;
   }
+  // fprintf(stderr, "!!!!!!!!!!!");
 
-  print_energy();
+  // print_energy();
 }
 
-void audio_async::get(int ms, std::vector<float>& result) {
+int audio_async::get(int ms, std::vector<float>& result, bool return_silence) {
   if (!m_dev_id_in) {
     fprintf(stderr, "%s: no audio device to get audio from!\n", __func__);
-    return;
+    return 0;
   }
 
   if (!m_running) {
     fprintf(stderr, "%s: not running!\n", __func__);
-    return;
+    return 0;
   }
 
   result.clear();
@@ -327,6 +332,14 @@ void audio_async::get(int ms, std::vector<float>& result) {
       memcpy(result.data(), &m_audio[s0], n_samples * sizeof(float));
     }
   }
+  if (return_silence) {
+    int total_silence_ms = get_total_silence_ms();
+    m_total_silence_ms = 0;
+    fprintf(stdout, "tmp: %d\n", total_silence_ms);
+    return total_silence_ms;
+  }
+
+  return 0;
 
   // print_energy();
 }

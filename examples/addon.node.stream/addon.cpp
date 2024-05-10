@@ -141,12 +141,12 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
     const int max_ms = 5000;  // Максимальное время для транскрипции, 10 секунд
     int vad_window_ms = default_vad_window;
     auto last_sample_time = std::chrono::high_resolution_clock::now();
-    int time_since_last = 900000; 
+    int time_since_last = 900000;
 
     while (!shouldStop) {
       // Process audio and transcribe
       if (!use_vad) {
-      // if (!use_vad) {
+        // if (!use_vad) {
         while (true) {
           audio.get(params.step_ms, pcmf32_new);
           if ((int)pcmf32_new.size() > 2 * n_samples_step) {
@@ -198,8 +198,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
         // Stage 2.2 if voice detected get vad_window_ms audio
         // fprintf(stdout, "Before VAD: vad_window_ms: %d \n", vad_window_ms);
         if (vad_detection(pcmf32_new, WHISPER_SAMPLE_RATE, vad_window_ms,
-                          params.vad_thold, params.freq_thold, true, false))
-        {
+                          params.vad_thold, params.freq_thold, true, false)) {
           fprintf(stdout, "VAD Detected!\n");
 
           // Определить продолжительность следующей выборки
@@ -209,7 +208,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
                   .count());
 
           // fprintf(stdout, "time_since_last: %d\n", time_since_last);
-          
+
           // fprintf(stdout, "time_since_last: %d\n", time_since_last);
 
           if (time_since_last > max_ms) {
@@ -218,7 +217,10 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
           }
           int capture_length_ms = std::min(max_ms, time_since_last);
 
-          audio.get(capture_length_ms, pcmf32);
+          int skipped_ms = audio.get(capture_length_ms, pcmf32, true);
+
+          fprintf(stdout, "skipped_ms: %d \n", skipped_ms);
+
           last_sample_time =
               std::chrono::high_resolution_clock::now();  // Сохранить время
                                                           // последнего захвата

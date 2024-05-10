@@ -29,10 +29,11 @@ class audio_async {
   // callback to be called by SDL
   void callback(uint8_t* stream, int len);
   void print_energy();
+  int get_total_silence_ms();
   void callback_ignore_silence(uint8_t* stream, int len);
 
   // get audio data from the circular buffer
-  void get(int ms, std::vector<float>& audio);
+  int get(int ms, std::vector<float>& audio, bool return_silence = false);
 
  private:
   SDL_AudioDeviceID m_dev_id_in = 0;
@@ -40,6 +41,7 @@ class audio_async {
   int m_len_ms = 0;
   int m_sample_rate = 0;
   bool m_ignore_silence = false;
+  int m_total_silence_ms = 0;
 
   std::atomic_bool m_running;
   std::mutex m_mutex;
