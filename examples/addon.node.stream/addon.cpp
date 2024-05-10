@@ -218,8 +218,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
           }
           int capture_length_ms = std::min(max_ms, time_since_last);
 
-          // audio.get(capture_length_ms, pcmf32);
-          audio.get(max_ms, pcmf32);
+          audio.get(capture_length_ms, pcmf32);
           last_sample_time =
               std::chrono::high_resolution_clock::now();  // Сохранить время
                                                           // последнего захвата
