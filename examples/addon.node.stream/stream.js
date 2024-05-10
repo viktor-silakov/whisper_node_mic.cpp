@@ -38,6 +38,7 @@ const worker = whisperAddon.transcribeAudio(params, (err, data) => {
 process.on('SIGINT', () => {
   console.log('\nReceived SIGINT. 👋 Bye!');
   worker.stop();
+  process.exit(1);
 });
 
 

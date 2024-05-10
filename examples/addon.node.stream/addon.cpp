@@ -7,7 +7,7 @@
 #include <thread>
 #include <vector>
 
-#include "common-sdl.h"
+#include "common-sdl_2.h"
 #include "common.h"
 #include "utils.h"
 #include "whisper.h"
@@ -90,7 +90,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
     // Initialize Whisper context
     ctx = init_whisper_context(params, 0, nullptr);
 
-    audio_async audio(params.length_ms);  // max_ms ?????
+    audio_async audio(params.length_ms, true);  // max_ms ?????
     if (!audio.init(params.capture_id, WHISPER_SAMPLE_RATE)) {
       SetError("Audio initialization failed");
       return;
@@ -241,14 +241,14 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
           }
 
           if (elapsed_ms > max_ms) {
-            fprintf(stdout,
-                    "⚠️ Warning: Maximum transcription time reached, "
-                    "some audio may be lost.\n");
+            // fprintf(stdout,
+            //         "⚠️ Warning: Maximum transcription time reached, "
+            //         "some audio may be lost.\n");
           }
-          fprintf(stdout,
-                  "No VAD, elapsed_ms: %d, vad_window_ms: %d,  max_ms: %d, "
-                  "length_ms: %d \n",
-                  elapsed_ms, vad_window_ms, max_ms, params.length_ms);
+          // fprintf(stdout,
+          //         "No VAD, elapsed_ms: %d, vad_window_ms: %d,  max_ms: %d, "
+          //         "length_ms: %d \n",
+          //         elapsed_ms, vad_window_ms, max_ms, params.length_ms);
 
           // wait for next iteration
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
