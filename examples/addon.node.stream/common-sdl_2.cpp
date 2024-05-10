@@ -265,7 +265,7 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
   }
   energy = std::sqrt(energy / temp_buffer.size());
 
-  if (energy >= 0.0050) {
+  if (energy >= 0.0020) {
     // Если энергия выше порога, записываем семплы в буфер
     std::lock_guard<std::mutex> lock(m_mutex);
 
