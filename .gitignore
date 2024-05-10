@@ -60,3 +60,4 @@ cmake-build-debug/
 .cxx/
 .gradle/
 local.properties
+examples/addon.node.stream/output.wav

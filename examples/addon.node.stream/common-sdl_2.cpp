@@ -265,7 +265,7 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
   }
   energy = std::sqrt(energy / temp_buffer.size());
 
-  if (energy >= 0.0020) {
+  if (energy >= 0.0040) {
     // Если энергия выше порога, записываем семплы в буфер
     std::lock_guard<std::mutex> lock(m_mutex);
 
@@ -285,14 +285,40 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
       m_audio_pos = (m_audio_pos + n_samples) % m_audio.size();
       m_audio_len = std::min(m_audio_len + n_samples, m_audio.size());
     }
+
+    m_total_silence_ms = 0; // Сбрасываем счетчик тишины
   } else {
     // Если энергия ниже порога, увеличиваем счетчик тишины
     int silence_ms = (n_samples * 1000) / m_sample_rate;
     m_total_silence_ms += silence_ms;
-  }
-  // fprintf(stderr, "!!!!!!!!!!!");
 
-  // print_energy();
+    if (m_total_silence_ms >= 500) {
+      // Если пауза тишины длится 500 мс или более, заполняем буфер значениями 0.0020f
+      std::lock_guard<std::mutex> lock(m_mutex);
+
+      size_t fill_samples = (m_sample_rate * 600) / 1000; // Заполняем на 600 мс
+      if (fill_samples > m_audio.size()) {
+        fill_samples = m_audio.size();
+      }
+
+      if (m_audio_pos + fill_samples > m_audio.size()) {
+        const size_t n0 = m_audio.size() - m_audio_pos;
+
+        std::fill(&m_audio[m_audio_pos], &m_audio[m_audio_pos] + n0, 0.0020f);
+        std::fill(&m_audio[0], &m_audio[fill_samples - n0], 0.0020f);
+
+        m_audio_pos = (m_audio_pos + fill_samples) % m_audio.size();
+        m_audio_len = m_audio.size();
+      } else {
+        std::fill(&m_audio[m_audio_pos], &m_audio[m_audio_pos] + fill_samples, 0.0020f);
+
+        m_audio_pos = (m_audio_pos + fill_samples) % m_audio.size();
+        m_audio_len = std::min(m_audio_len + fill_samples, m_audio.size());
+      }
+
+      m_total_silence_ms = 0; // Сбрасываем счетчик тишины
+    }
+  }
 }
 
 int audio_async::get(int ms, std::vector<float>& result, bool return_silence) {
@@ -339,7 +365,7 @@ int audio_async::get(int ms, std::vector<float>& result, bool return_silence) {
   if (return_silence) {
     int total_silence_ms = get_total_silence_ms();
     m_total_silence_ms = 0;
-    fprintf(stdout, "tmp: %d\n", total_silence_ms);
+    // fprintf(stdout, "tmp: %d\n", total_silence_ms);
     return total_silence_ms;
   }
 

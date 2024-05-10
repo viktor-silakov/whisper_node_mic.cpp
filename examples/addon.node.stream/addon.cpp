@@ -220,6 +220,8 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
     auto last_sample_time = std::chrono::high_resolution_clock::now();
     int time_since_last = 900000;
 
+    fprintf(stdout, "Start transcribing...\n");
+
     while (!shouldStop) {
       // Process audio and transcribe
       if (!use_vad) {
@@ -258,16 +260,16 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
         pcmf32_old = pcmf32;
       } else {
         // Stage 1: Waiting
-        const auto t_now = std::chrono::high_resolution_clock::now();
-        const auto t_diff =
-            std::chrono::duration_cast<std::chrono::milliseconds>(t_now -
-                                                                  t_start)
-                .count();
+        // const auto t_now = std::chrono::high_resolution_clock::now();
+        // const auto t_diff =
+        //     std::chrono::duration_cast<std::chrono::milliseconds>(t_now -
+        //                                                           t_start)
+        //         .count();
 
-        if (t_diff < 2000) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          continue;
-        }
+        // if (t_diff < 2000) {
+        //   std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        //   continue;
+        // }
         // Stage 2: Voice Detect (VAD)
         // Stage 2.1 get sample for VAD
         audio.get(1100, pcmf32_new);
@@ -294,15 +296,16 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
           }
           
           int skipped_ms =  audio.get_total_silence_ms();
+          // fprintf(stdout, "skipped_ms: %d \n", skipped_ms);
+
           time_since_last = time_since_last - skipped_ms;
           int capture_length_ms = std::min(max_ms, time_since_last);
 
           audio.get(capture_length_ms, pcmf32, true);
 
-          save_to_wav("output.wav", pcmf32, 16000);
-          exit(1);
+          // save_to_wav("output.wav", pcmf32, 16000);
+          // exit(1);
 
-          fprintf(stdout, "skipped_ms: %d \n", skipped_ms);
 
           last_sample_time =
               std::chrono::high_resolution_clock::now();  // Сохранить время
