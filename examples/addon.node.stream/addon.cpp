@@ -183,7 +183,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
         // Stage 2.2 if voice detected get vad_window_ms audio
         // fprintf(stdout, "Before VAD: vad_window_ms: %d \n", vad_window_ms);
         if (vad_detection(pcmf32_new, WHISPER_SAMPLE_RATE, vad_window_ms,
-                          params.vad_thold, params.freq_thold, true, true)) {
+                          params.vad_thold, params.freq_thold, true, false)) {
           fprintf(stdout, "VAD Detected!\n");
 
           // Определить продолжительность следующей выборки
