@@ -26,8 +26,6 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
   void Stop() { shouldStop = true; }
   ~WhisperWorker() {}
 
-  
-  
   bool vad_detection(std::vector<float> &pcmf32, int sample_rate, int last_ms,
                      float vad_thold, float freq_thold, bool wait_for_fade_out,
                      bool verbose) {
@@ -123,7 +121,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
     wparams.prompt_n_tokens = params.no_context ? 0 : prompt_tokens.size();
 
     // Определите значения по умолчанию
-    const int default_vad_window = 1000;
+    const int default_vad_window = 700;
     const int min_last_ms = 120;
     const int decrement_ms = 100;
     // const int max_ms = 7000;  // Максимальное время для транскрипции, 10
@@ -133,7 +131,6 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
     int time_since_last = 900000;
 
     bool zsr_detect = false;
-
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     fprintf(stdout, "Start transcribing...\n");
@@ -190,7 +187,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
         // Stage 2: Voice Detect (VAD)
         // Stage 2.1 get sample for VAD
         audio.get(2000, pcmf32_new);
-        
+
         // Stage 2.2 if voice detected get vad_window_ms audio
         // fprintf(stdout, "Before VAD: vad_window_ms: %d \n", vad_window_ms);
         if (vad_detection(pcmf32_new, WHISPER_SAMPLE_RATE, vad_window_ms,
@@ -214,8 +211,11 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
           }
 
           int skipped_ms = audio.get_total_silence_ms();
-          fprintf(stdout, "skipped_ms: %d, time_since_last: %d, diff: %d \n",
-                  skipped_ms, time_since_last, time_since_last - skipped_ms);
+          fprintf(stdout,
+                  "skipped_ms: %d, time_since_last: %d, diff: %d, "
+                  "vad_window_ms: %d \n",
+                  skipped_ms, time_since_last, time_since_last - skipped_ms,
+                  vad_window_ms);
 
           time_since_last = time_since_last - skipped_ms;
           // time_since_last = time_since_last;
@@ -223,7 +223,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
 
           audio.get(capture_ms, pcmf32, true);
 
-          save_to_wav("output.wav", pcmf32, 16000);
+          // save_to_wav("output.wav", pcmf32, 16000);
 
           last_sample_time =
               std::chrono::high_resolution_clock::now();  // Сохранить время
@@ -239,21 +239,21 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
                   .count());
 
           audio.get(time_since_last, pcmf32_zcr);
-        
-          zsr_detect =  vad_detection_windowed_zcr(pcmf32_new, WHISPER_SAMPLE_RATE,
-                                   vad_window_ms, (params.vad_thold / 20),
-                                   false);
+
+          zsr_detect = vad_detection_windowed_zcr(
+              pcmf32_new, WHISPER_SAMPLE_RATE, vad_window_ms,
+              (params.vad_thold / 20), false);
 
           // if(zsr_detect){
           //   std::cout <<  "!!!!!!!!!!!!!!✅    zsr_detect!!!! " << std::endl;
           // }
 
-
           // fprintf(stdout, "Elapsed time since last sample: %d ms\n",
           // elapsed_ms);
 
           // Уменьшить окно паузы, но не ниже минимального
-          if (zsr_detect && (vad_window_ms > min_last_ms) && elapsed_ms > params.soft_ms_th) {
+          if (zsr_detect && (vad_window_ms > min_last_ms) &&
+              elapsed_ms > params.soft_ms_th) {
             vad_window_ms = std::max(vad_window_ms - decrement_ms, min_last_ms);
           }
 

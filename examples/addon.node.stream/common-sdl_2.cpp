@@ -295,15 +295,16 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
     int silence_ms = (n_samples * 1000) / m_sample_rate;
     m_current_silence_ms += silence_ms;
     m_total_skipped_ms += silence_ms;
+    const int ms_to_fill = 700;
 
-    if (m_current_silence_ms >= 500 && !m_is_filled) {
+    if (m_current_silence_ms >= ms_to_fill && !m_is_filled) {
       fprintf(stdout, "🍎\n");
-      m_total_skipped_ms = m_total_skipped_ms - 500;
-      // Если пауза тишины длится 500 мс или более и буфер еще не был заполнен,
+      m_total_skipped_ms = m_total_skipped_ms - ms_to_fill;
+      // Если пауза тишины длится 700 мс или более и буфер еще не был заполнен,
       // заполняем буфер значениями 0.0020f
       std::lock_guard<std::mutex> lock(m_mutex);
 
-      size_t fill_samples = (m_sample_rate * 500) / 1000;
+      size_t fill_samples = (m_sample_rate * ms_to_fill) / 1000;
       if (fill_samples > m_audio.size()) {
         fill_samples = m_audio.size();
       }
