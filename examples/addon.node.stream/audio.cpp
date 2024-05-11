@@ -45,7 +45,7 @@
 //     return false;
 // }
 
-// bool process_audio_vad(audio_async& audio, std::vector<float>& pcmf32_new, std::vector<float>& pcmf32, int sample_rate, int length_ms, float vad_thold, float freq_thold) {
+// bool process_audio_vad(audio_async& audio, std::vector<float>& pcmf32_new, std::vector<float>& pcmf32, int sample_rate, int soft_ms_th, float vad_thold, float freq_thold) {
 //     static auto t_last = std::chrono::high_resolution_clock::now();
 //     const auto t_now  = std::chrono::high_resolution_clock::now();
 //     const auto t_diff = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last).count();
@@ -55,7 +55,7 @@
 //     }
 //     audio.get(2000, pcmf32_new);
 //     if (::vad_simple(pcmf32_new, sample_rate, 1000, vad_thold, freq_thold, false)) {
-//         audio.get(length_ms, pcmf32);
+//         audio.get(soft_ms_th, pcmf32);
 //         t_last = t_now;
 //         return true;
 //     } else {

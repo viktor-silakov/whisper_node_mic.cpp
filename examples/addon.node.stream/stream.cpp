@@ -19,21 +19,21 @@ int main(int argc, char** argv) {
     }
 
     params.keep_ms   = std::min(params.keep_ms,   params.step_ms);
-    params.length_ms = std::max(params.length_ms, params.step_ms);
+    params.soft_ms_th = std::max(params.soft_ms_th, params.step_ms);
 
     const int n_samples_step = (1e-3*params.step_ms  )*WHISPER_SAMPLE_RATE;
-    const int n_samples_len  = (1e-3*params.length_ms)*WHISPER_SAMPLE_RATE;
+    const int n_samples_len  = (1e-3*params.soft_ms_th)*WHISPER_SAMPLE_RATE;
     const int n_samples_keep = (1e-3*params.keep_ms  )*WHISPER_SAMPLE_RATE;
     const int n_samples_30s  = (1e-3*30000.0         )*WHISPER_SAMPLE_RATE;
 
     const bool use_vad = n_samples_step <= 0;
-    const int n_new_line = !use_vad ? std::max(1, params.length_ms / params.step_ms - 1) : 1;
+    const int n_new_line = !use_vad ? std::max(1, params.soft_ms_th / params.step_ms - 1) : 1;
 
     params.no_timestamps  = !use_vad;
     params.no_context    |= use_vad;
     params.max_tokens     = 0;
 
-    audio_async audio(params.length_ms);
+    audio_async audio(params.soft_ms_th);
     if (!audio.init(params.capture_id, WHISPER_SAMPLE_RATE)) {
         fprintf(stderr, "%s: audio.init() failed!\n", __func__);
         return 1;
@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
             audio.get(2000, pcmf32_new);
 
             if (::vad_simple(pcmf32_new, WHISPER_SAMPLE_RATE, 1000, params.vad_thold, params.freq_thold, false)) {
-                audio.get(params.length_ms, pcmf32);
+                audio.get(params.soft_ms_th, pcmf32);
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;

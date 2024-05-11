@@ -84,7 +84,7 @@ void print_whisper_result(whisper_context* ctx, const whisper_params& params, bo
         printf("\33[2K\r");
     } else {
         const int64_t t1 = (std::chrono::high_resolution_clock::now() - t_start).count()/1000000;
-        const int64_t t0 = std::max(static_cast<int64_t>(0), t1 - params.length_ms);
+        const int64_t t0 = std::max(static_cast<int64_t>(0), t1 - params.soft_ms_th);
         printf("\n");
         printf("### Transcription %d START | t0 = %d ms | t1 = %d ms\n", n_iter, (int) t0, (int) t1);
         printf("\n");

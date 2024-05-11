@@ -14,4 +14,4 @@
 // void create_wav_writer(wav_writer& wavWriter, const std::string& filename, int sample_rate);
 // std::string get_current_datetime();
 // bool process_audio_non_vad(audio_async& audio, std::vector<float>& pcmf32_new, int n_samples_step, int step_ms);
-// bool process_audio_vad(audio_async& audio, std::vector<float>& pcmf32_new, std::vector<float>& pcmf32, int sample_rate, int length_ms, float vad_thold, float freq_thold);
+// bool process_audio_vad(audio_async& audio, std::vector<float>& pcmf32_new, std::vector<float>& pcmf32, int sample_rate, int soft_ms_th, float vad_thold, float freq_thold);
