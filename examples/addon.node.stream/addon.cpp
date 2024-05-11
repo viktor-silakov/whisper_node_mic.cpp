@@ -301,7 +301,8 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
           int skipped_ms = audio.get_total_silence_ms();
           // fprintf(stdout, "skipped_ms: %d \n", skipped_ms);
 
-          time_since_last = time_since_last - skipped_ms;
+          // time_since_last = time_since_last - skipped_ms;
+          time_since_last = time_since_last;
           int capture_length_ms = std::min(max_ms, time_since_last);
 
           audio.get(capture_length_ms, pcmf32, true);

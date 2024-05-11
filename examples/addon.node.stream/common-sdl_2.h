@@ -42,6 +42,8 @@ class audio_async {
   int m_sample_rate = 0;
   bool m_ignore_silence = false;
   int m_total_silence_ms = 0;
+  
+  int m_current_silence_ms = 0;
 
   std::atomic_bool m_running;
   std::mutex m_mutex;

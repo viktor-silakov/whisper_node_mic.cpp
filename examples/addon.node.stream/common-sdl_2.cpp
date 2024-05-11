@@ -267,7 +267,7 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
 
   // static bool is_filled = false;  // Локальная переменная is_filled
 
-  if (energy >= 0.0040) {
+  if (energy >= 0.0030) {
     // Если энергия выше порога, записываем семплы в буфер
     std::lock_guard<std::mutex> lock(m_mutex);
 
@@ -288,20 +288,21 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
       m_audio_len = std::min(m_audio_len + n_samples, m_audio.size());
     }
 
-    m_total_silence_ms = 0;  // Сбрасываем счетчик тишины
+    m_current_silence_ms = 0;  // Сбрасываем счетчик тишины
     m_is_filled = false;  // Сбрасываем флаг заполнения буфера
   } else {
     // Если энергия ниже порога, увеличиваем счетчик тишины
     int silence_ms = (n_samples * 1000) / m_sample_rate;
+    m_current_silence_ms += silence_ms;
     m_total_silence_ms += silence_ms;
 
-    if (m_total_silence_ms >= 500 && !m_is_filled) {
+    if (m_current_silence_ms >= 500 && !m_is_filled) {
       fprintf(stdout, "🍎\n");
       // Если пауза тишины длится 500 мс или более и буфер еще не был заполнен,
       // заполняем буфер значениями 0.0020f
       std::lock_guard<std::mutex> lock(m_mutex);
 
-      size_t fill_samples = (m_sample_rate * 555) / 1000;
+      size_t fill_samples = (m_sample_rate * 500) / 1000;
       if (fill_samples > m_audio.size()) {
         fill_samples = m_audio.size();
       }
@@ -324,6 +325,7 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
       }
 
       m_is_filled = true;  // Устанавливаем флаг заполнения буфера
+      m_current_silence_ms = 0;
     }
   }
 }
