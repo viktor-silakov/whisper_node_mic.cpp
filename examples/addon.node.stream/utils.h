@@ -52,3 +52,6 @@ void update_prompt_tokens(whisper_context* ctx,
                           bool no_context);
 void log_debug(const char* func, float energy_all, float energy_last,
                float vad_thold, float freq_thold);
+
+bool save_to_wav(const std::string& filename,
+                 const std::vector<float>& audio_data, int sample_rate);
