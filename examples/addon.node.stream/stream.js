@@ -13,6 +13,7 @@ const params = {
   keep_ms: 500, // audio to keep from previous step
   // capture_id: -1,
   capture_id: 1, // input device id (-1 for auto)
+  vad_thold: parseFloat('0.5'),
   // translate: false,
   // language: 'en',
   // use_gpu: false

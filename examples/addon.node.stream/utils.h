@@ -56,3 +56,7 @@ void log_debug(const char* func, float energy_all, float energy_last,
 
 bool save_to_wav(const std::string& filename,
                  const std::vector<float>& audio_data, int sample_rate);
+
+bool vad_detection_windowed_zcr(const std::vector<float>& pcmf32,
+                                int sample_rate, int window_ms,
+                                float zcr_threshold, bool verbose);

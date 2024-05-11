@@ -238,8 +238,8 @@ void audio_async::callback(uint8_t* stream, int len) {
 }
 
 int audio_async::get_total_silence_ms() {
-  int result = m_total_silence_ms;
-  m_total_silence_ms = 0;
+  int result = m_total_skipped_ms;
+  m_total_skipped_ms = 0;
   return result;
 }
 
@@ -294,10 +294,11 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
     // Если энергия ниже порога, увеличиваем счетчик тишины
     int silence_ms = (n_samples * 1000) / m_sample_rate;
     m_current_silence_ms += silence_ms;
-    m_total_silence_ms += silence_ms;
+    m_total_skipped_ms += silence_ms;
 
     if (m_current_silence_ms >= 500 && !m_is_filled) {
       fprintf(stdout, "🍎\n");
+      m_total_skipped_ms = m_total_skipped_ms - 500;
       // Если пауза тишины длится 500 мс или более и буфер еще не был заполнен,
       // заполняем буфер значениями 0.0020f
       std::lock_guard<std::mutex> lock(m_mutex);
@@ -373,7 +374,7 @@ int audio_async::get(int ms, std::vector<float>& result, bool return_silence) {
   }
   if (return_silence) {
     int total_silence_ms = get_total_silence_ms();
-    m_total_silence_ms = 0;
+    m_total_skipped_ms = 0;
     // fprintf(stdout, "tmp: %d\n", total_silence_ms);
     return total_silence_ms;
   }
