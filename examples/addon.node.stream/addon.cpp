@@ -72,7 +72,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
     // Initialize Whisper context
     ctx = init_whisper_context(params, 0, nullptr);
 
-    audio_async audio(params.soft_ms_th, 0.0030f);  // max_ms ?????
+    audio_async audio( params.hard_ms_th, 0.0030f);  
     if (!audio.init(params.capture_id, WHISPER_SAMPLE_RATE)) {
       SetError("Audio initialization failed");
       return;
@@ -120,7 +120,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
     const int default_vad_window = 1000;
     const int min_last_ms = 120;
     const int decrement_ms = 100;
-    const int max_ms = 7000;  // Максимальное время для транскрипции, 10 секунд
+    // const int max_ms = 7000;  // Максимальное время для транскрипции, 10 секунд
     int vad_window_ms = default_vad_window;
     auto last_sample_time = std::chrono::high_resolution_clock::now();
     int time_since_last = 900000;
@@ -196,8 +196,8 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
 
           // fprintf(stdout, "time_since_last: %d\n", time_since_last);
 
-          if (time_since_last > max_ms) {
-            fprintf(stdout, "Warning: max_ms: '%d' - exided: '%d'\n", max_ms,
+          if (time_since_last >  params.hard_ms_th) {
+            fprintf(stdout, "Warning:  params.hard_ms_th: '%d' - exided: '%d'\n",  params.hard_ms_th,
                     time_since_last);
           }
 
@@ -206,7 +206,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
 
           // time_since_last = time_since_last - skipped_ms;
           time_since_last = time_since_last;
-          int capture_ms = std::min(max_ms, time_since_last);
+          int capture_ms = std::min( params.hard_ms_th, time_since_last);
 
           audio.get(capture_ms, pcmf32, true);
 
@@ -233,15 +233,15 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
             vad_window_ms = std::max(vad_window_ms - decrement_ms, min_last_ms);
           }
 
-          if (elapsed_ms > max_ms) {
+          if (elapsed_ms >  params.hard_ms_th) {
             // fprintf(stdout,
             //         "⚠️ Warning: Maximum transcription time reached, "
             //         "some audio may be lost.\n");
           }
           // fprintf(stdout,
-          //         "No VAD, elapsed_ms: %d, vad_window_ms: %d,  max_ms: %d, "
+          //         "No VAD, elapsed_ms: %d, vad_window_ms: %d,   params.hard_ms_th: %d, "
           //         "soft_ms_th: %d \n",
-          //         elapsed_ms, vad_window_ms, max_ms, params.soft_ms_th);
+          //         elapsed_ms, vad_window_ms,  params.hard_ms_th, params.soft_ms_th);
 
           // wait for next iteration
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -359,6 +359,10 @@ Napi::Value TranscribeAudio(const Napi::CallbackInfo &info) {
   int32_t soft_ms_th = obj.Has("soft_ms_th")
                           ? obj.Get("soft_ms_th").As<Napi::Number>().Int32Value()
                           : 10000;  // useles??
+
+  int32_t hard_ms_th = obj.Has("hard_ms_th")
+                          ? obj.Get("hard_ms_th").As<Napi::Number>().Int32Value()
+                          : 10000;  // useles??
   int32_t keep_ms = obj.Has("keep_ms")
                         ? obj.Get("keep_ms").As<Napi::Number>().Int32Value()
                         : 200;
@@ -383,6 +387,7 @@ Napi::Value TranscribeAudio(const Napi::CallbackInfo &info) {
   params.n_threads = n_threads;
   params.step_ms = step_ms;
   params.soft_ms_th = soft_ms_th;
+  params.hard_ms_th = hard_ms_th;
   params.keep_ms = keep_ms;
   params.capture_id = capture_id;
   params.translate = translate;
@@ -390,6 +395,7 @@ Napi::Value TranscribeAudio(const Napi::CallbackInfo &info) {
 
   params.keep_ms = std::min(params.keep_ms, params.step_ms);
   params.soft_ms_th = std::max(params.soft_ms_th, params.step_ms);
+  params.hard_ms_th = std::max(params.hard_ms_th, params.soft_ms_th);
 
   params.no_timestamps = false;
   params.no_context = false;
