@@ -5,6 +5,26 @@
 #include <cassert>
 #include <cstdio>
 
+void log_debug(const char *func, float energy_all, float energy_last,
+                 float vad_thold, float freq_thold) {
+    auto now = std::chrono::system_clock::now();
+    auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+    auto epoch = now_ms.time_since_epoch();
+    auto value = std::chrono::duration_cast<std::chrono::milliseconds>(epoch);
+    long long milliseconds = value.count();
+
+    auto now_time = std::chrono::system_clock::to_time_t(now);
+    char timestamp[24];
+    std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S",
+                  std::localtime(&now_time));
+
+    fprintf(stderr,
+            "[%s.%03lld] %s: energy_all: %f, energy_last: %f, vad_thold: %f, "
+            "freq_thold: %f\n",
+            timestamp, milliseconds % 1000, func, energy_all, energy_last,
+            vad_thold, freq_thold);
+  }
+
 struct whisper_context* init_whisper_context(const whisper_params& params, int argc, char** argv) {
     if (params.language != "auto" && whisper_lang_id(params.language.c_str()) == -1) {
         fprintf(stderr, "error: unknown language '%s'\n", params.language.c_str());

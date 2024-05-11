@@ -101,26 +101,6 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
   void Stop() { shouldStop = true; }
   ~WhisperWorker() {}
 
-  void log_debug(const char *func, float energy_all, float energy_last,
-                 float vad_thold, float freq_thold) {
-    auto now = std::chrono::system_clock::now();
-    auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
-    auto epoch = now_ms.time_since_epoch();
-    auto value = std::chrono::duration_cast<std::chrono::milliseconds>(epoch);
-    long long milliseconds = value.count();
-
-    auto now_time = std::chrono::system_clock::to_time_t(now);
-    char timestamp[24];
-    std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S",
-                  std::localtime(&now_time));
-
-    fprintf(stderr,
-            "[%s.%03lld] %s: energy_all: %f, energy_last: %f, vad_thold: %f, "
-            "freq_thold: %f\n",
-            timestamp, milliseconds % 1000, func, energy_all, energy_last,
-            vad_thold, freq_thold);
-  }
-
   bool vad_detection(std::vector<float> &pcmf32, int sample_rate, int last_ms,
                      float vad_thold, float freq_thold, bool wait_for_fade_out,
                      bool verbose) {
@@ -217,7 +197,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
     const int default_vad_window = 1000;
     const int min_last_ms = 120;
     const int decrement_ms = 100;
-    const int max_ms = 5000;  // Максимальное время для транскрипции, 10 секунд
+    const int max_ms = 7000;  // Максимальное время для транскрипции, 10 секунд
     int vad_window_ms = default_vad_window;
     auto last_sample_time = std::chrono::high_resolution_clock::now();
     int time_since_last = 900000;
@@ -280,7 +260,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
         // Stage 2.2 if voice detected get vad_window_ms audio
         // fprintf(stdout, "Before VAD: vad_window_ms: %d \n", vad_window_ms);
         if (vad_detection(pcmf32_new, WHISPER_SAMPLE_RATE, vad_window_ms,
-                          params.vad_thold, params.freq_thold, true, false)) {
+                          params.vad_thold, params.freq_thold, true, true)) {
           fprintf(stdout, "VAD Detected!\n");
 
           // Определить продолжительность следующей выборки

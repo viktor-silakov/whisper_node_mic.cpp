@@ -8,7 +8,7 @@ const params = {
   // step_ms: 500,
   step_ms: 0, // audio step size
               // if step_ms is null voise autodetect (vad) activates (!) low process utilization!
-  length_ms: 3000, // audio length
+  length_ms: 5000, // audio length
   keep_ms: 500, // audio to keep from previous step
   // capture_id: -1,
   capture_id: 1, // input device id (-1 for auto)
