@@ -49,6 +49,7 @@ class audio_async {
   std::vector<float> m_audio;
   size_t m_audio_pos = 0;
   size_t m_audio_len = 0;
+  bool m_is_filled = false;
 };
 
 // Return false if need to quit

@@ -1,3 +1,5 @@
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_audio.h>
 #include <napi.h>
 
 #include <cassert>
@@ -12,10 +14,8 @@
 #include "utils.h"
 #include "whisper.h"
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_audio.h>
-
-bool save_to_wav(const std::string& filename, const std::vector<float>& audio_data, int sample_rate) {
+bool save_to_wav(const std::string &filename,
+                 const std::vector<float> &audio_data, int sample_rate) {
   SDL_AudioSpec wav_spec;
   SDL_zero(wav_spec);
 
@@ -29,13 +29,14 @@ bool save_to_wav(const std::string& filename, const std::vector<float>& audio_da
   SDL_zero(cvt);
 
   if (SDL_BuildAudioCVT(&cvt, wav_spec.format, wav_spec.channels, wav_spec.freq,
-                        wav_spec.format, wav_spec.channels, wav_spec.freq) < 0) {
+                        wav_spec.format, wav_spec.channels,
+                        wav_spec.freq) < 0) {
     fprintf(stderr, "Failed to build audio converter: %s\n", SDL_GetError());
     return false;
   }
 
   cvt.len = audio_data.size() * sizeof(float);
-  cvt.buf = (Uint8*)SDL_malloc(cvt.len * cvt.len_mult);
+  cvt.buf = (Uint8 *)SDL_malloc(cvt.len * cvt.len_mult);
   memcpy(cvt.buf, audio_data.data(), cvt.len);
 
   if (SDL_ConvertAudio(&cvt) < 0) {
@@ -44,26 +45,27 @@ bool save_to_wav(const std::string& filename, const std::vector<float>& audio_da
     return false;
   }
 
-  SDL_RWops* out = SDL_RWFromFile(filename.c_str(), "wb");
+  SDL_RWops *out = SDL_RWFromFile(filename.c_str(), "wb");
   if (!out) {
     fprintf(stderr, "Failed to open file for writing: %s\n", SDL_GetError());
     SDL_free(cvt.buf);
     return false;
   }
 
-  SDL_WriteLE32(out, 0x46464952);  // "RIFF"
+  SDL_WriteLE32(out, 0x46464952);        // "RIFF"
   SDL_WriteLE32(out, cvt.len_cvt + 36);  // Chunk size
-  SDL_WriteLE32(out, 0x45564157);  // "WAVE"
-  SDL_WriteLE32(out, 0x20746d66);  // "fmt "
-  SDL_WriteLE32(out, 16);  // Subchunk size
+  SDL_WriteLE32(out, 0x45564157);        // "WAVE"
+  SDL_WriteLE32(out, 0x20746d66);        // "fmt "
+  SDL_WriteLE32(out, 16);                // Subchunk size
   SDL_WriteLE16(out, 3);  // Audio format (1 = PCM, 3 = IEEE Float)
   SDL_WriteLE16(out, wav_spec.channels);  // Number of channels
-  SDL_WriteLE32(out, wav_spec.freq);  // Sample rate
-  SDL_WriteLE32(out, wav_spec.freq * wav_spec.channels * sizeof(float));  // Byte rate
-  SDL_WriteLE16(out, wav_spec.channels * sizeof(float));  // Block align
+  SDL_WriteLE32(out, wav_spec.freq);      // Sample rate
+  SDL_WriteLE32(
+      out, wav_spec.freq * wav_spec.channels * sizeof(float));  // Byte rate
+  SDL_WriteLE16(out, wav_spec.channels * sizeof(float));        // Block align
   SDL_WriteLE16(out, sizeof(float) * 8);  // Bits per sample
-  SDL_WriteLE32(out, 0x61746164);  // "data"
-  SDL_WriteLE32(out, cvt.len_cvt);  // Data chunk size
+  SDL_WriteLE32(out, 0x61746164);         // "data"
+  SDL_WriteLE32(out, cvt.len_cvt);        // Data chunk size
   SDL_RWwrite(out, cvt.buf, cvt.len_cvt, 1);
 
   SDL_RWclose(out);
@@ -220,6 +222,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
     auto last_sample_time = std::chrono::high_resolution_clock::now();
     int time_since_last = 900000;
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     fprintf(stdout, "Start transcribing...\n");
 
     while (!shouldStop) {
@@ -260,16 +263,16 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
         pcmf32_old = pcmf32;
       } else {
         // Stage 1: Waiting
-        // const auto t_now = std::chrono::high_resolution_clock::now();
-        // const auto t_diff =
-        //     std::chrono::duration_cast<std::chrono::milliseconds>(t_now -
-        //                                                           t_start)
-        //         .count();
+        const auto t_now = std::chrono::high_resolution_clock::now();
+        const auto t_diff =
+            std::chrono::duration_cast<std::chrono::milliseconds>(t_now -
+                                                                  t_start)
+                .count();
 
-        // if (t_diff < 2000) {
-        //   std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        //   continue;
-        // }
+        if (t_diff < 1000) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(100));
+          continue;
+        }
         // Stage 2: Voice Detect (VAD)
         // Stage 2.1 get sample for VAD
         audio.get(1100, pcmf32_new);
@@ -294,8 +297,8 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
             fprintf(stdout, "Warning: max_ms: '%d' - exided: '%d'\n", max_ms,
                     time_since_last);
           }
-          
-          int skipped_ms =  audio.get_total_silence_ms();
+
+          int skipped_ms = audio.get_total_silence_ms();
           // fprintf(stdout, "skipped_ms: %d \n", skipped_ms);
 
           time_since_last = time_since_last - skipped_ms;
@@ -303,9 +306,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
 
           audio.get(capture_length_ms, pcmf32, true);
 
-          // save_to_wav("output.wav", pcmf32, 16000);
-          // exit(1);
-
+          save_to_wav("output.wav", pcmf32, 16000);
 
           last_sample_time =
               std::chrono::high_resolution_clock::now();  // Сохранить время
@@ -374,6 +375,8 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
 
         progress.Send(&segment_text, 1);
       }
+
+      exit(1);
 
       // fprintf(stdout, "Iteration: %d \n", n_iter);
 
