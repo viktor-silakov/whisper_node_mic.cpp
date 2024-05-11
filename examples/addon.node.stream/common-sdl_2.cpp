@@ -5,9 +5,9 @@
 #include <iostream>
 // #include "common-sdl.h"
 
-audio_async::audio_async(int len_ms, bool ignore_silence) {
+audio_async::audio_async(int len_ms, float silence_th) {
   m_len_ms = len_ms;
-  m_ignore_silence = ignore_silence;
+  m_silence_th = silence_th;
   m_running = false;
   // m_audio.resize(100, 0.0055f); // Инициализируем буфер одним нулевым
   // значением
@@ -51,7 +51,7 @@ bool audio_async::init(int capture_id, int sample_rate) {
   capture_spec_requested.channels = 1;
   capture_spec_requested.samples = 1024;
 
-  if (m_ignore_silence) {
+  if (m_silence_th != 0) {
     capture_spec_requested.callback = [](void* userdata, uint8_t* stream,
                                          int len) {
       audio_async* audio = (audio_async*)userdata;
@@ -267,7 +267,7 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
 
   // static bool is_filled = false;  // Локальная переменная is_filled
 
-  if (energy >= 0.0030) {
+  if (energy >= m_silence_th) {
     // Если энергия выше порога, записываем семплы в буфер
     std::lock_guard<std::mutex> lock(m_mutex);
 

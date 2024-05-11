@@ -72,7 +72,7 @@ class WhisperWorker : public Napi::AsyncProgressWorker<std::string> {
     // Initialize Whisper context
     ctx = init_whisper_context(params, 0, nullptr);
 
-    audio_async audio(params.length_ms, true);  // max_ms ?????
+    audio_async audio(params.length_ms, 0.0030f);  // max_ms ?????
     if (!audio.init(params.capture_id, WHISPER_SAMPLE_RATE)) {
       SetError("Audio initialization failed");
       return;

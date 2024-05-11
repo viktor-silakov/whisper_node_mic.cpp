@@ -15,7 +15,7 @@
 class audio_async {
  public:
   // audio_async(int len_ms);
-  audio_async(int len_ms, bool ignore_silence = true);
+  audio_async(int len_ms, float silence_th = 0);
   ~audio_async();
 
   bool init(int capture_id, int sample_rate);
@@ -40,7 +40,7 @@ class audio_async {
 
   int m_len_ms = 0;
   int m_sample_rate = 0;
-  bool m_ignore_silence = false;
+  float m_silence_th = 0;
   int m_total_silence_ms = 0;
   
   int m_current_silence_ms = 0;
