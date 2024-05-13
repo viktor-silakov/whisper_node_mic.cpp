@@ -78,7 +78,7 @@ public:
         return speech_detected;
     }
 
-    void Execute(const ExecutionProgress& progress)
+    void Execute(const ExecutionProgress& progress) override
     {
         // Initialize Whisper context
         ctx = init_whisper_context(params, 0, nullptr);
@@ -95,15 +95,9 @@ public:
         std::vector<float> pcmf32_old;
         std::vector<float> pcmf32_new(n_samples_30s, 0.0f);
         std::vector<float> pcmf32_zcr(n_samples_30s, 0.0f);
-
         std::vector<whisper_token> prompt_tokens;
-
         print_processing_info(ctx, params, n_samples_step, n_samples_len, n_samples_keep, use_vad, n_new_line);
-
-        int n_iter = 0;
-
         const auto t_start = std::chrono::high_resolution_clock::now();
-
         whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
 
         wparams.print_progress = false;
@@ -205,7 +199,6 @@ public:
                 const bool over_load = time_since_last > params.hard_ms_th;
 
                 // Stage 2.2 if voice detected get audio
-                // fprintf(stdout, "Before VAD: vad_window_ms: %d \n", vad_window_ms);
                 // fprintf(stdout, "time_since_last: %d, params.hard_ms_th: %d, overload: %s \n", time_since_last, params.hard_ms_th, over_load ? "ON" : "OFF");
                 if (voice_fade_out_detect
                     || (over_load)) {
@@ -244,9 +237,6 @@ public:
                     //     continue;
                     // }
 
-                    // std::cout << std::endl << "[[" << capture_ms << "]]" <<
-                    // std::endl;
-
                     // save_to_wav("output.wav", pcmf32, 16000);
 
                     last_sample_time = std::chrono::high_resolution_clock::now(); // Сохранить время
@@ -255,11 +245,6 @@ public:
                     vad_window_ms = default_vad_window;
                 } else {
                     // Stage 2.1 change the vad windows if need and continue if no vad detected
-                    // time_since_last = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                    //     std::chrono::high_resolution_clock::now() - last_sample_time)
-                    //                                        .count());
-
-                    // fprintf(stdout, ".\n");
 
                     audio.get(time_since_last, pcmf32_zcr);
 
@@ -295,8 +280,6 @@ public:
                 }
             }
 
-            // fprintf(stdout, "%zu NEXT!\n", pcmf32.size());
-
             // Stage 3: Transcribe
 
             // Stage 3.1:
@@ -306,7 +289,7 @@ public:
             // Проверяем, нужно ли добавить нули
             if (pcmf32.size() <= required_size) {
                 // Вычисляем количество нулей, которые нужно добавить
-                fprintf(stdout, "[[ 🚨🚨 %d ms %zu, %d]]", static_cast<int>((pcmf32.size() / static_cast<float>(WHISPER_SAMPLE_RATE)) * 1000.0f), pcmf32.size(), required_size);
+                fprintf(stdout, "[[ 🚨🚨 %d ms %zu,  %d]]", static_cast<int>((pcmf32.size() / static_cast<float>(WHISPER_SAMPLE_RATE)) * 1000.0f), pcmf32.size(), required_size);
 
                 // save_to_wav("output.wav", pcmf32, 16000);
                 // exit(0);
@@ -331,10 +314,6 @@ public:
             }
 
             int executed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - w_start).count();
-            // // Выводим результат
-            // std::cout << "<"
-            //           << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - w_start).count()
-            //           << ">";
 
             // Stage 3.2:
             // Send the transcription results to the main thread
@@ -348,19 +327,6 @@ public:
 
                 progress.Send(&segment_text, 1);
             }
-
-            // exit(1);
-
-            // fprintf(stdout, "Iteration: %d \n", n_iter);
-
-            ++n_iter;
-
-            // if (!use_vad && (n_iter % n_new_line) == 0) {
-            //   pcmf32_old =
-            //       std::vector<float>(pcmf32.end() - n_samples_keep,
-            //       pcmf32.end());
-            // update_prompt_tokens(ctx, prompt_tokens, params.no_context);
-            // }
         }
 
         // Clean up
