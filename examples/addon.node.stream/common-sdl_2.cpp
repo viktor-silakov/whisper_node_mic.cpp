@@ -298,7 +298,7 @@ void audio_async::callback_ignore_silence(uint8_t* stream, int len) {
     const int ms_to_fill = 700;
 
     if (m_current_silence_ms >= ms_to_fill && !m_is_filled) {
-      fprintf(stdout, "🍎\n");
+      fprintf(stdout, "[  ]");
       m_total_skipped_ms = m_total_skipped_ms - ms_to_fill;
       // Если пауза тишины длится 700 мс или более и буфер еще не был заполнен,
       // заполняем буфер значениями 0.0020f
